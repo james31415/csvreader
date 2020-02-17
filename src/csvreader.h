@@ -85,7 +85,7 @@ b8 IsBadSimpleFieldCharacter(u8 Character)
 
 void ParseSimpleField(reader* Reader)
 {
-    char Buffer[255];
+    char Buffer[256];
     u8 Index = 0;
 
     u8 Character = GetCharacterFromFile(Reader);
@@ -100,7 +100,7 @@ void ParseSimpleField(reader* Reader)
     ++Index;
 
     Character = GetCharacterFromFile(Reader);
-    while (!IsBadSimpleFieldCharacter(Character))
+    while (!IsBadSimpleFieldCharacter(Character) && Index < 255)
     {
         Buffer[Index] = Character;
         ++Index;
@@ -125,10 +125,10 @@ b8 ProcessDoubleQuote(reader* Reader, u8 Character)
     return 0;
 }
 
-u8 ParseSubField(reader* Reader, char* Buffer, u32* Index)
+u8 ParseSubField(reader* Reader, char* Buffer, u32* Index, u32 BufferLen)
 {
     u8 Character = GetCharacterFromFile(Reader);
-    while ((Character != '"'))
+    while ((Character != '"') && *Index < BufferLen)
     {
         Buffer[*Index] = Character;
         ++(*Index);
@@ -147,13 +147,13 @@ void ParseQuotedField(reader* Reader)
 
     u32 Index = 0;
 
-    u8 Character = ParseSubField(Reader, Buffer, &Index);
-    while (ProcessDoubleQuote(Reader, Character))
+    u8 Character = ParseSubField(Reader, Buffer, &Index, 255);
+    while (ProcessDoubleQuote(Reader, Character) && Index < 255)
     {
         Buffer[Index] = '"';
         ++Index;
 
-        Character = ParseSubField(Reader, Buffer, &Index);
+        Character = ParseSubField(Reader, Buffer, &Index, 255);
     }
     Assert(Character == '"');
 
