@@ -21,6 +21,15 @@ typedef FIELD_CALLBACK(field_callback);
 #define ROW_CALLBACK(name) b8 name(void* UserData)
 typedef ROW_CALLBACK(row_callback);
 
+#ifndef READER_MALLOC
+#define READER_MALLOC(Size) malloc(Size)
+#endif
+
+static void* reader_malloc(size_t Size)
+{
+  return READER_MALLOC(Size);
+}
+
 typedef struct reader
 {
     s32 FileID;
@@ -35,19 +44,28 @@ typedef struct reader
     u8* Buffer;
 } reader;
 
-u8 PeekCharacterFromFile(reader* Reader)
+u8 PeekCharacterFromFile(reader* Reader, u8* Character)
 {
-    u8 Result = 0;
-    Assert(Reader->BufferPosition < Reader->BufferSize);
+    if (!(Reader->BufferPosition < Reader->BufferSize))
+    {
+      return 0;
+    }
 
-    Result = Reader->Buffer[Reader->BufferPosition];
+    if (Character)
+    {
+      *Character = Reader->Buffer[Reader->BufferPosition];
+    }
 
-    return Result;
+    return 1;
 }
 
 u8 GetCharacterFromFile(reader* Reader)
 {
-    u8 Result = PeekCharacterFromFile(Reader);
+    u8 Result;
+    if (PeekCharacterFromFile(Reader, &Result) == 0)
+    {
+      Assert(0);
+    }
     ++Reader->BufferPosition;
 
     return Result;
@@ -85,10 +103,36 @@ b8 IsBadSimpleFieldCharacter(u8 Character)
 
 void ParseSimpleField(reader* Reader)
 {
-    char Buffer[256];
-    u8 Index = 0;
+    u32 Size = 0;
+    u32 SavedPosition = Reader->BufferPosition;
 
     u8 Character = GetCharacterFromFile(Reader);
+    if (IsBadSimpleFieldCharacter(Character))
+    {
+        Unread(Reader);
+        return;
+    }
+
+    ++Size;
+
+    Character = GetCharacterFromFile(Reader);
+    while (!IsBadSimpleFieldCharacter(Character) && Size < Reader->BufferSize)
+    {
+        ++Size;
+
+        Character = GetCharacterFromFile(Reader);
+    }
+    ++Size;
+
+    char* Buffer = reader_malloc(Size);
+    if (!Buffer) {
+      return;
+    }
+
+    Reader->BufferPosition = SavedPosition;
+    u8 Index = 0;
+
+    Character = GetCharacterFromFile(Reader);
 
     if (IsBadSimpleFieldCharacter(Character))
     {
@@ -96,11 +140,13 @@ void ParseSimpleField(reader* Reader)
         return;
     }
 
-    Buffer[Index] = Character;
-    ++Index;
+    if (Index < Size - 1) {
+      Buffer[Index] = Character;
+      ++Index;
+    }
 
     Character = GetCharacterFromFile(Reader);
-    while (!IsBadSimpleFieldCharacter(Character) && Index < 255)
+    while (!IsBadSimpleFieldCharacter(Character) && Index < Size - 1)
     {
         Buffer[Index] = Character;
         ++Index;
@@ -108,7 +154,9 @@ void ParseSimpleField(reader* Reader)
         Character = GetCharacterFromFile(Reader);
     }
     Unread(Reader);
-    Buffer[Index] = '\0';
+    if (Index < Size) {
+      Buffer[Index] = '\0';
+    }
 
     if (Reader->FieldCallback)
         Reader->FieldCallback(Buffer, Reader->UserData);
@@ -116,7 +164,13 @@ void ParseSimpleField(reader* Reader)
 
 b8 ProcessDoubleQuote(reader* Reader, u8 Character)
 {
-    if ((Character == '"') && (PeekCharacterFromFile(Reader) == '"'))
+    u8 TempCharacter;
+    if (PeekCharacterFromFile(Reader, &TempCharacter) == 0)
+    {
+      Assert(0);
+    }
+
+    if ((Character == '"') && (TempCharacter == '"'))
     {
         GetCharacterFromFile(Reader);
         return 1;
@@ -143,17 +197,36 @@ void ParseQuotedField(reader* Reader)
 {
     GetCharacterFromFile(Reader);
 
-    char Buffer[256];
+    u32 Size = 256;
+    char* Buffer = reader_malloc(Size);
+    if (!Buffer) {
+      return;
+    }
 
     u32 Index = 0;
 
-    u8 Character = ParseSubField(Reader, Buffer, &Index, 255);
-    while (ProcessDoubleQuote(Reader, Character) && Index < 255)
+    u8 Character = GetCharacterFromFile(Reader);
+    while ((Character != '"') && Index < Size - 1)
+    {
+      Buffer[Index] = Character;
+      ++Index;
+      
+      Character = GetCharacterFromFile(Reader);
+    }
+
+    while (ProcessDoubleQuote(Reader, Character) && Index < Size - 1)
     {
         Buffer[Index] = '"';
         ++Index;
 
-        Character = ParseSubField(Reader, Buffer, &Index, 255);
+        Character = GetCharacterFromFile(Reader);
+        while ((Character != '"') && Index < Size - 1)
+        {
+          Buffer[Index] = Character;
+          ++Index;
+      
+          Character = GetCharacterFromFile(Reader);
+        }
     }
     Assert(Character == '"');
 
@@ -166,7 +239,12 @@ void ParseQuotedField(reader* Reader)
 
 void ParseRawField(reader* Reader)
 {
-    u8 Character = PeekCharacterFromFile(Reader);
+    u8 Character;
+    if (PeekCharacterFromFile(Reader, &Character) == 0)
+    {
+      Assert(0);
+    }
+
     if (Character == '"')
     {
         ParseQuotedField(Reader);
@@ -182,7 +260,12 @@ void ParseRawString(reader* Reader)
     ConsumeSpaces(Reader);
     ParseRawField(Reader);
 
-    u8 Character = PeekCharacterFromFile(Reader);
+    u8 Character;
+    if (PeekCharacterFromFile(Reader, &Character) == 0)
+    {
+      Assert(0);
+    }
+
     if (!IsFieldTerminator(Character))
     {
         ConsumeSpaces(Reader);
@@ -191,7 +274,7 @@ void ParseRawString(reader* Reader)
 
 void ParseCsvFile(reader* Reader)
 {
-    while (PeekCharacterFromFile(Reader))
+    while (PeekCharacterFromFile(Reader, NULL) != 0)
     {
         u8 Character;
         do

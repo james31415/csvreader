@@ -1,7 +1,7 @@
+#include <stdlib.h>
 #include "csvreader.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 typedef struct Position
@@ -69,13 +69,13 @@ ReadEntireFile(const char* FileName) {
   size_t FileSize = ftell(File);
   fseek(File, 0, SEEK_SET);
 
-  u8* Result = (u8*)malloc(FileSize + 1);
+  u8* Result = (u8*)malloc(FileSize);
   if (!Result) {
     printf("malloc failed! %s (%d)", __FILE__, __LINE__);
     exit(1);
   }
   fread(Result, FileSize, 1, File);
-  Result[FileSize] = 0;
+  Result[FileSize - 1] = 0;
 
   fclose(File);
 
