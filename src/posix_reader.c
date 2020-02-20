@@ -4,6 +4,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 typedef struct Position
 {
     u32 Row;
@@ -55,6 +59,19 @@ FIELD_CALLBACK(PrintField)
     ++pos->Column;
 }
 
+u64
+GetFileSize(const char* FileName) {
+  u64 Result = 0;
+
+  struct stat buffer;
+  int status = stat(FileName, &buffer);
+  if (status == 0) {
+    Result = (u64)buffer.st_size;
+  }
+
+  return Result;
+}
+
 u8*
 ReadEntireFile(const char* FileName) {
   FILE* File = fopen(FileName, "r");
@@ -65,17 +82,17 @@ ReadEntireFile(const char* FileName) {
 
   printf("Successfully opened %s\n", FileName);
 
-  fseek(File, 0, SEEK_END);
-  size_t FileSize = ftell(File);
-  fseek(File, 0, SEEK_SET);
+  u64 FileSize = GetFileSize(FileName);
 
-  u8* Result = (u8*)malloc(FileSize);
+  u8* Result = (u8*)malloc(FileSize + 1);
   if (!Result) {
     printf("malloc failed! %s (%d)", __FILE__, __LINE__);
     exit(1);
   }
   fread(Result, FileSize, 1, File);
-  Result[FileSize - 1] = 0;
+  Result[FileSize] = 0;
+
+  printf("Result: %s\n", Result);
 
   fclose(File);
 

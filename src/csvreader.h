@@ -5,8 +5,11 @@
 #define Gigabytes(U) (Megabytes(U) * 1024LL)
 
 typedef int32_t s32;
-typedef uint32_t u32;
+
 typedef uint8_t u8;
+typedef uint32_t u32;
+typedef uint64_t u64;
+
 typedef uint8_t b8;
 
 #ifdef _DEBUG

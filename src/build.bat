@@ -5,7 +5,7 @@ REM call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxil
 call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\VC\Auxiliary\Build\vcvars64.bat" > nul
 cd /d %pwd%
 
-set SOURCES=main.c
+set SOURCES=win32_reader.c
 set PROGRAM=reader
 
 if not exist ..\bin mkdir ..\bin

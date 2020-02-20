@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-SOURCES=main.c
+SOURCES=posix_reader.c
 PROGRAM=reader
 
 mkdir -p ../bin
